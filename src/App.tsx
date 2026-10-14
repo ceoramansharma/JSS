@@ -28,7 +28,7 @@ import { ContactPage } from './components/ContactPage';
 import { CustomPageView } from './components/CustomPageView';
 import { WhyTrustSection } from './components/WhyTrustSection';
 import { SkeletonScreen } from './components/SkeletonScreen';
-import { useSectionToggles } from './utils/themeContent';
+import { useSectionToggles, DEFAULT_SECTION_TOGGLES } from './utils/themeContent';
 import { getPageBySlug } from './utils/customPagesStore';
 
 // Sub-pages
@@ -78,27 +78,15 @@ interface AppProps {
 }
 
 export default function App({ isHeadlessMode = false }: AppProps) {
-  // Check if headless mode or WordPress page builder canvas is active
-  const isHeadlessActive = (() => {
-    if (isHeadlessMode) return true;
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    const search = window.location.search.toLowerCase();
-    return (
-      params.get('headless-mode') === '1' ||
-      params.get('headless-mode') === 'true' ||
-      params.get('headless') === '1' ||
-      params.get('headless') === 'true' ||
-      search.includes('elementor-preview') ||
-      params.get('action') === 'elementor' ||
-      search.includes('et_fb=1') ||
-      document.body.classList.contains('elementor-editor-active') ||
-      document.body.classList.contains('et-fb')
-    );
-  })();
-
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => parseCurrentUrl());
   const { toggles } = useSectionToggles();
+
+  // Safety guard: Ensure at least the core sections are enabled so body content never disappears
+  const safeToggles = React.useMemo(() => {
+    const hasActive = Object.values(toggles).some(Boolean);
+    return hasActive ? toggles : DEFAULT_SECTION_TOGGLES;
+  }, [toggles]);
+
   const [liveSyncToast, setLiveSyncToast] = useState<{ message: string; timestamp: number } | null>(null);
 
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -434,11 +422,6 @@ export default function App({ isHeadlessMode = false }: AppProps) {
     transitionTo(`/${slug}/`, { type: 'custom-page', slug });
   };
 
-  // If in headless-mode or page-builder canvas mode, safely render empty null to prevent any clashing
-  if (isHeadlessActive) {
-    return null;
-  }
-
   // Check for skeleton testing query parameter (?skeleton=1 or ?loading=1)
   const isForceSkeleton = typeof window !== 'undefined' && 
     (new URLSearchParams(window.location.search).get('skeleton') === '1' || 
@@ -476,7 +459,7 @@ export default function App({ isHeadlessMode = false }: AppProps) {
         {currentRoute.type === 'home' && (
           <>
             {/* Hero Section with Live Evaluation Intake Form & State Calculator */}
-            {toggles.hero && (
+            {safeToggles.hero && (
               <HeroSection 
                 onOpenApply={handleOpenApply} 
                 onNavigateBook={handleNavigateBook}
@@ -485,13 +468,13 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* Trust Proof Bar (99.2% approval, 15m turnaround, 50k patients, HIPAA) */}
-            {toggles.trustStats && <TrustStatsBar />}
+            {safeToggles.trustStats && <TrustStatsBar />}
 
             {/* How It Works (3 Steps) */}
-            {toggles.howItWorks && <HowItWorksSection onOpenApply={() => handleOpenApply()} />}
+            {safeToggles.howItWorks && <HowItWorksSection onOpenApply={() => handleOpenApply()} />}
 
             {/* State-by-State Pricing & Law Guide (Directory & Filter) */}
-            {toggles.stateDirectory && (
+            {safeToggles.stateDirectory && (
               <StateDirectorySection 
                 onOpenApply={(stateId) => handleOpenApply(stateId)}
                 onNavigateState={handleNavigateState}
@@ -499,10 +482,10 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* Benefits Comparison: Medical vs Recreational + Interactive Tax Savings Calculator */}
-            {toggles.benefits && <BenefitsComparisonSection onOpenApply={() => handleOpenApply()} />}
+            {safeToggles.benefits && <BenefitsComparisonSection onOpenApply={() => handleOpenApply()} />}
 
             {/* Comprehensive Services (New Card, Renewal, Cultivation 99-Plant) */}
-            {toggles.services && (
+            {safeToggles.services && (
               <ServicesSection 
                 onOpenApply={handleOpenApply} 
                 onNavigateService={handleNavigateService}
@@ -510,7 +493,7 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* California Telehealth Cities Coverage Directory */}
-            {toggles.cities && (
+            {safeToggles.cities && (
               <LocalCitiesDirectorySection
                 onNavigateCity={handleNavigateCity}
                 onOpenApply={handleOpenApply}
@@ -518,7 +501,7 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* Qualifying Conditions & 30-Second Pre-Qualification Self-Check */}
-            {toggles.conditions && (
+            {safeToggles.conditions && (
               <QualifyingConditionsSection 
                 onOpenApply={() => handleOpenApply()} 
                 onNavigateCondition={handleNavigateCondition}
@@ -526,7 +509,7 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* Medical Marijuana Insights & Educational Blog Showcase */}
-            {toggles.blogTeaser && (
+            {safeToggles.blogTeaser && (
               <BlogHomeTeaserSection 
                 onNavigateBlog={handleNavigateBlog}
                 onNavigateArticle={handleNavigateArticle}
@@ -534,27 +517,27 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             )}
 
             {/* Interactive State Reciprocity Checker */}
-            {toggles.reciprocity && (
+            {safeToggles.reciprocity && (
               <ReciprocityCheckerSection onOpenApply={(stateId) => handleOpenApply(stateId)} />
             )}
 
             {/* Transparent Pricing Packages */}
-            {toggles.pricing && <PricingPlansSection onOpenApply={handleOpenApply} />}
+            {safeToggles.pricing && <PricingPlansSection onOpenApply={handleOpenApply} />}
 
             {/* Medical Advisory Board & Licensed MDs */}
-            {toggles.doctors && <DoctorDirectorySection />}
+            {safeToggles.doctors && <DoctorDirectorySection />}
 
             {/* Why Patients Trust Online MMJ Card (About Section Anchor) */}
-            {toggles.whyTrust && <WhyTrustSection onOpenApply={() => handleOpenApply()} />}
+            {safeToggles.whyTrust && <WhyTrustSection onOpenApply={() => handleOpenApply()} />}
 
             {/* Verified Patient Reviews */}
-            {toggles.reviews && <ReviewsSection />}
+            {safeToggles.reviews && <ReviewsSection />}
 
             {/* SEO Topical Authority & Complete Patient Guide */}
-            {toggles.seoContent && <SEOContentSection onOpenApply={handleOpenApply} />}
+            {safeToggles.seoContent && <SEOContentSection onOpenApply={handleOpenApply} />}
 
             {/* Frequently Asked Questions */}
-            {toggles.faq && (
+            {safeToggles.faq && (
               <FAQSection 
                 onOpenApply={() => handleOpenApply()} 
                 onOpenContact={() => setIsContactModalOpen(true)} 

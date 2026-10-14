@@ -471,25 +471,36 @@ function online_mmj_card_enqueue_assets() {
     }
 
     // 4. Pass dynamic configuration parameters to frontend scripts
+    $mmj_settings = array(
+        'siteUrl'        => esc_url(home_url('/')),
+        'ajaxUrl'        => admin_url('admin-ajax.php'),
+        'restUrl'        => esc_url_raw(rest_url('online-mmj/v1/submit-evaluation')),
+        'apiUrl'         => esc_url_raw(rest_url('online-mmj/v1')),
+        'apiNonce'       => wp_create_nonce('wp_rest'),
+        'themeUri'       => $theme_dir_uri,
+        'isLoggedIn'     => is_user_logged_in(),
+        'isUserAdmin'    => current_user_can('manage_options'),
+        'themeContent'   => function_exists('online_mmj_get_theme_content') ? online_mmj_get_theme_content() : array(),
+        'sectionToggles' => function_exists('online_mmj_get_section_toggles') ? online_mmj_get_section_toggles() : array(),
+        'customCities'   => function_exists('online_mmj_get_cities') ? online_mmj_get_cities() : array(),
+        'customStates'   => function_exists('online_mmj_get_states') ? online_mmj_get_states() : array(),
+        'affiliateUrl'   => get_option('online_mmj_affiliate_url', 'https://leafwell.com/get-card?utm_source=onlinemmjcard&ref=affiliate_portal'),
+        'redirectDelay'  => intval(get_option('online_mmj_redirect_delay', 2)),
+        'startingPrice'  => get_option('online_mmj_starting_price', '$55'),
+    );
+
+    // Modern inline JSON script ensures full nested objects and booleans are preserved
+    wp_add_inline_script(
+        'online-mmj-card-compiled-js',
+        'window.onlineMMJCardSettings = ' . wp_json_encode($mmj_settings) . ';',
+        'before'
+    );
+
+    // Fallback localization for legacy script handlers
     wp_localize_script(
         'online-mmj-card-compiled-js',
         'onlineMMJCardSettings',
-        array(
-            'siteUrl'        => esc_url(home_url('/')),
-            'ajaxUrl'        => admin_url('admin-ajax.php'),
-            'restUrl'        => esc_url_raw(rest_url('online-mmj/v1/submit-evaluation')),
-            'apiUrl'         => esc_url_raw(rest_url('online-mmj/v1')),
-            'apiNonce'       => wp_create_nonce('wp_rest'),
-            'themeUri'       => $theme_dir_uri,
-            'isLoggedIn'     => is_user_logged_in(),
-            'themeContent'   => function_exists('online_mmj_get_theme_content') ? online_mmj_get_theme_content() : array(),
-            'sectionToggles' => function_exists('online_mmj_get_section_toggles') ? online_mmj_get_section_toggles() : array(),
-            'customCities'   => function_exists('online_mmj_get_cities') ? online_mmj_get_cities() : array(),
-            'customStates'   => function_exists('online_mmj_get_states') ? online_mmj_get_states() : array(),
-            'affiliateUrl'   => get_option('online_mmj_affiliate_url', 'https://leafwell.com/get-card?utm_source=onlinemmjcard&ref=affiliate_portal'),
-            'redirectDelay'  => intval(get_option('online_mmj_redirect_delay', 2)),
-            'startingPrice'  => get_option('online_mmj_starting_price', '$55'),
-        )
+        $mmj_settings
     );
 }
 add_action('wp_enqueue_scripts', 'online_mmj_card_enqueue_assets');

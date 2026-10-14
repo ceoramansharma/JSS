@@ -14,38 +14,28 @@ export function checkIsPageBuilderOrHeadlessMode(): boolean {
   const urlParams = new URLSearchParams(window.location.search);
   const searchStr = window.location.search.toLowerCase();
 
-  // 1. Explicit Headless Mode Query Flag or Setting
+  // 1. Explicit Headless Mode Query Flag
   const hasHeadlessFlag =
     urlParams.get('headless-mode') === '1' ||
     urlParams.get('headless-mode') === 'true' ||
     urlParams.get('headless') === '1' ||
-    urlParams.get('headless') === 'true' ||
-    (window as unknown as { onlineMMJCardSettings?: { headlessMode?: boolean } })?.onlineMMJCardSettings?.headlessMode === true;
+    urlParams.get('headless') === 'true';
 
   if (hasHeadlessFlag) {
     return true;
   }
 
-  // 2. Elementor Editor Canvas Detection (Active editor mode only - never standard preview)
+  // 2. Elementor Editor Canvas Detection (Active editor canvas only - never standard visitor or preview)
   const isElementor =
-    searchStr.includes('elementor-preview') ||
-    urlParams.get('action') === 'elementor' ||
-    document.body.classList.contains('elementor-editor-active') ||
-    document.body.classList.contains('elementor-editor-preview');
+    (searchStr.includes('elementor-preview') && urlParams.get('action') === 'elementor') ||
+    document.body.classList.contains('elementor-editor-active');
 
-  // 3. Divi Builder Visual Canvas Detection
+  // 3. Divi Builder Visual Canvas Detection (Active visual builder only)
   const isDivi =
-    searchStr.includes('et_fb=1') ||
-    document.body.classList.contains('et-fb') ||
-    document.body.classList.contains('et_pb_builder_active');
+    searchStr.includes('et_fb=1') &&
+    (document.body.classList.contains('et-fb') || document.body.classList.contains('et_pb_builder_active'));
 
-  // 4. Beaver Builder or WordPress Admin Screen
-  const isOtherEditorCanvas =
-    searchStr.includes('fl_builder') ||
-    document.body.classList.contains('wp-admin') ||
-    document.body.classList.contains('block-editor-page');
-
-  return Boolean(isElementor || isDivi || isOtherEditorCanvas);
+  return Boolean(isElementor || isDivi);
 }
 
 const isHeadlessOrBuilder = checkIsPageBuilderOrHeadlessMode();

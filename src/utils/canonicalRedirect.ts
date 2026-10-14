@@ -427,12 +427,79 @@ let overlayDrawerOpen = false;
 
 /**
  * Injects or updates an interactive SEO Canonical Diagnostic Overlay directly into the DOM.
+/**
+ * Detects if the current user is an authorized backend administrator, clinician,
+ * or developer who should have access to the diagnostic tools and overlay.
+ * Regular customers and public visitors MUST NEVER see the diagnostic overlay or tabs!
+ */
+export function isAuthorizedAdminOrBackendUser(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  // 1. Explicit admin/developer URL query flags (?canonical_debug=1, ?seo_debug=1, ?admin=1, ?builder=1, ?editor=1)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (
+      params.get('canonical_debug') === '1' ||
+      params.get('seo_debug') === '1' ||
+      params.get('admin') === '1' ||
+      params.get('builder') === '1' ||
+      params.get('editor') === '1' ||
+      params.get('debug') === '1'
+    ) {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. WordPress Admin Bar or wp-admin classes on body
+  if (typeof document !== 'undefined') {
+    if (
+      document.body.classList.contains('admin-bar') ||
+      document.body.classList.contains('wp-admin')
+    ) {
+      return true;
+    }
+  }
+
+  // 3. WordPress Localized User Permissions
+  const wpSettings = (window as unknown as { onlineMMJCardSettings?: { isUserAdmin?: boolean; isLoggedIn?: boolean } })?.onlineMMJCardSettings;
+  if (wpSettings?.isUserAdmin || (wpSettings?.isLoggedIn && wpSettings?.isUserAdmin !== false)) {
+    return true;
+  }
+
+  // 4. Manual developer override in localStorage
+  try {
+    if (localStorage.getItem('online_mmj_admin_debug') === 'true') {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
+/**
+ * Diagnostic Overlay Mount & Management
+ * Rendered ONLY for backend administrators and developers.
+ *
  * Includes:
- * - Floating status badge with pass rate & live canonical status
+ * - Floating status badge with pass rate & live canonical status (for backend users)
  * - Slide-over drawer with full verification matrix, active tags inspector, live route tester, and export tools
  */
-export function mountCanonicalDiagnosticOverlay(): void {
+export function mountCanonicalDiagnosticOverlay(force = false): void {
   if (typeof document === 'undefined') return;
+
+  // Strict customer privacy guard: Never mount for regular customers unless authorized or explicitly forced by admin
+  if (!force && !isAuthorizedAdminOrBackendUser()) {
+    const existing = document.getElementById('online-mmj-canonical-inspector');
+    if (existing) {
+      existing.remove();
+      overlayMounted = false;
+    }
+    return;
+  }
 
   const OVERLAY_CONTAINER_ID = 'online-mmj-canonical-inspector';
   let container = document.getElementById(OVERLAY_CONTAINER_ID);
@@ -462,6 +529,7 @@ export function mountCanonicalDiagnosticOverlay(): void {
 
 /**
  * Toggles the Diagnostic Overlay open or closed.
+ * Can be triggered via keyboard shortcut Ctrl+Alt+C or from backend admin panels.
  */
 export function toggleCanonicalDiagnosticOverlay(forceState?: boolean): void {
   overlayDrawerOpen = forceState !== undefined ? forceState : !overlayDrawerOpen;
@@ -469,7 +537,8 @@ export function toggleCanonicalDiagnosticOverlay(forceState?: boolean): void {
   if (container) {
     renderDiagnosticOverlayUI(container);
   } else {
-    mountCanonicalDiagnosticOverlay();
+    // Force mount when manually triggered by authorized shortcut or admin action
+    mountCanonicalDiagnosticOverlay(true);
   }
 }
 
@@ -965,14 +1034,24 @@ export function enforceCanonicalRedirect(currentRoute?: AppRoute): CanonicalRedi
     );
   }
 
-  // 2. Initialize or update diagnostic overlay if active
+  // 2. Initialize or update diagnostic overlay ONLY for authorized backend / admin users
   try {
-    if (!overlayMounted) {
-      mountCanonicalDiagnosticOverlay();
+    const isBackendAdmin = isAuthorizedAdminOrBackendUser();
+    if (isBackendAdmin) {
+      if (!overlayMounted) {
+        mountCanonicalDiagnosticOverlay();
+      } else {
+        const container = document.getElementById('online-mmj-canonical-inspector');
+        if (container) {
+          renderDiagnosticOverlayUI(container);
+        }
+      }
     } else {
-      const container = document.getElementById('online-mmj-canonical-inspector');
-      if (container) {
-        renderDiagnosticOverlayUI(container);
+      // Ensure the inspector container is completely absent from DOM for customers
+      const existing = document.getElementById('online-mmj-canonical-inspector');
+      if (existing) {
+        existing.remove();
+        overlayMounted = false;
       }
     }
   } catch (e) {

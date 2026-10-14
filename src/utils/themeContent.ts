@@ -285,18 +285,32 @@ export const SECTION_TOGGLES_KEY = 'online_mmj_section_toggles_v1';
 export function getSectionToggles(): SectionToggles {
   if (typeof window === 'undefined') return DEFAULT_SECTION_TOGGLES;
 
-  const wpSettings = (window as unknown as { onlineMMJCardSettings?: { sectionToggles?: Partial<SectionToggles> } })?.onlineMMJCardSettings;
+  const wpSettings = (window as unknown as { onlineMMJCardSettings?: { sectionToggles?: Record<string, unknown> } })?.onlineMMJCardSettings;
   const wpToggles = wpSettings?.sectionToggles;
 
   try {
     const raw = localStorage.getItem(SECTION_TOGGLES_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    return {
+
+    // Normalize WordPress boolean values (in case strings '1', 'true', '0', 'false' were localized)
+    const normalizedWp: Partial<SectionToggles> = {};
+    if (wpToggles && typeof wpToggles === 'object') {
+      for (const [k, v] of Object.entries(wpToggles)) {
+        normalizedWp[k as keyof SectionToggles] = v === true || v === 1 || v === '1' || v === 'true';
+      }
+    }
+
+    const merged = {
       ...DEFAULT_SECTION_TOGGLES,
-      ...(wpToggles || {}),
+      ...normalizedWp,
       ...(parsed || {})
     };
-  } catch (e) {
+
+    // Safety guard: If corrupted settings or empty toggles disabled all sections,
+    // fallback to defaults so the homepage body content NEVER disappears!
+    const hasAnyActive = Object.values(merged).some(Boolean);
+    return hasAnyActive ? merged : DEFAULT_SECTION_TOGGLES;
+  } catch {
     return DEFAULT_SECTION_TOGGLES;
   }
 }
