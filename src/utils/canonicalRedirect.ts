@@ -481,6 +481,18 @@ export function isAuthorizedAdminOrBackendUser(): boolean {
 }
 
 /**
+ * Removes any DOM container for the Canonical SEO Inspector.
+ */
+export function removeCanonicalDiagnosticOverlay(): void {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('online-mmj-canonical-inspector');
+  if (existing) {
+    existing.remove();
+    overlayMounted = false;
+  }
+}
+
+/**
  * Diagnostic Overlay Mount & Management
  * Rendered ONLY for backend administrators and developers.
  *
@@ -493,11 +505,7 @@ export function mountCanonicalDiagnosticOverlay(force = false): void {
 
   // Strict customer privacy guard: Never mount for regular customers unless authorized or explicitly forced by admin
   if (!force && !isAuthorizedAdminOrBackendUser()) {
-    const existing = document.getElementById('online-mmj-canonical-inspector');
-    if (existing) {
-      existing.remove();
-      overlayMounted = false;
-    }
+    removeCanonicalDiagnosticOverlay();
     return;
   }
 
@@ -1034,26 +1042,9 @@ export function enforceCanonicalRedirect(currentRoute?: AppRoute): CanonicalRedi
     );
   }
 
-  // 2. Initialize or update diagnostic overlay ONLY for authorized backend / admin users
+  // 2. Remove any legacy DOM overlay outside React (the diagnostic tab is rendered strictly via React when isAdminUser is true)
   try {
-    const isBackendAdmin = isAuthorizedAdminOrBackendUser();
-    if (isBackendAdmin) {
-      if (!overlayMounted) {
-        mountCanonicalDiagnosticOverlay();
-      } else {
-        const container = document.getElementById('online-mmj-canonical-inspector');
-        if (container) {
-          renderDiagnosticOverlayUI(container);
-        }
-      }
-    } else {
-      // Ensure the inspector container is completely absent from DOM for customers
-      const existing = document.getElementById('online-mmj-canonical-inspector');
-      if (existing) {
-        existing.remove();
-        overlayMounted = false;
-      }
-    }
+    removeCanonicalDiagnosticOverlay();
   } catch (e) {
     // Non-blocking
   }

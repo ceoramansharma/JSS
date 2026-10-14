@@ -38,39 +38,47 @@ export function checkIsPageBuilderOrHeadlessMode(): boolean {
   return Boolean(isElementor || isDivi);
 }
 
-const isHeadlessOrBuilder = checkIsPageBuilderOrHeadlessMode();
+// ---------------------------------------------------------------------------
+// DOM Interactive Mounting Logic
+// ---------------------------------------------------------------------------
+// Guarantees the React root container is mounted only after the DOM is fully interactive
+// so pre-rendered body content does not flash, duplicate, or abruptly disappear.
+let isMounted = false;
 
-let container = document.getElementById('online-mmj-card-root') || document.getElementById('root');
+export function mountReactApp(): void {
+  if (isMounted || typeof document === 'undefined') return;
 
-// If running in standard visitor mode (not in a page builder editor)
-if (!isHeadlessOrBuilder) {
-  document.body.classList.add('online-mmj-spa-active');
+  const isHeadlessOrBuilder = checkIsPageBuilderOrHeadlessMode();
 
-  // If container does not exist on this page template yet, create it on body
-  if (!container && typeof document !== 'undefined') {
-    container = document.createElement('div');
-    container.id = 'online-mmj-card-root';
-    document.body.appendChild(container);
+  // Look for the primary theme root container or standard Vite root
+  let container = document.getElementById('online-mmj-card-root') || document.getElementById('root');
+
+  // If running in standard visitor mode (not inside an active page builder canvas)
+  if (!isHeadlessOrBuilder) {
+    // If container does not exist on this page template yet, create it on body
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'online-mmj-card-root';
+      document.body.appendChild(container);
+    }
+
+    // Mark SPA as active on body now that the DOM is interactive and container is confirmed
+    document.body.classList.add('online-mmj-spa-active');
   }
 
-  // If container is nested within WordPress template markup (e.g. .entry-content, article, main),
-  // suppress any stray static fallback sibling elements and text nodes so they don't break the layout.
-  if (container && container.parentElement && container.parentElement !== document.body) {
-    const parent = container.parentElement;
-    for (const child of Array.from(parent.children)) {
-      if (child !== container && !child.contains(container)) {
-        (child as HTMLElement).style.display = 'none';
-      }
-    }
-    for (const node of Array.from(parent.childNodes)) {
-      if (node !== container && node.nodeType === Node.TEXT_NODE) {
-        node.textContent = '';
-      }
-    }
+  if (container) {
+    isMounted = true;
+    const root = createRoot(container);
+    root.render(<App isHeadlessMode={isHeadlessOrBuilder} />);
   }
 }
 
-if (container) {
-  createRoot(container).render(<App isHeadlessMode={isHeadlessOrBuilder} />);
+// Execute mounting only after DOM is fully interactive (DOMContentLoaded or readyState check)
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountReactApp, { once: true });
+  } else {
+    // DOM is already interactive or complete
+    mountReactApp();
+  }
 }
-

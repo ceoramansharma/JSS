@@ -72,9 +72,27 @@ import {
 import { applyDynamicRouteSchema } from './utils/schemaStore';
 import { applyThemeStyles } from './utils/themeStyles';
 import { enforceCanonicalRedirect, detectDuplicateContent } from './utils/canonicalRedirect';
+import CanonicalSEODiagnosticTab from './components/CanonicalSEODiagnosticTab';
 
 interface AppProps {
   isHeadlessMode?: boolean;
+}
+
+function getInitialAdminStatus(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const hasAdminFlag = 
+      params.get('builder') === '1' || 
+      params.get('editor') === '1' || 
+      params.get('admin') === '1' ||
+      params.get('canonical_debug') === '1' ||
+      params.get('seo_debug') === '1';
+    const wpAdmin = (window as unknown as { onlineMMJCardSettings?: { isUserAdmin?: boolean } })?.onlineMMJCardSettings?.isUserAdmin;
+    return Boolean(hasAdminFlag || wpAdmin);
+  } catch {
+    return false;
+  }
 }
 
 export default function App({ isHeadlessMode = false }: AppProps) {
@@ -96,13 +114,26 @@ export default function App({ isHeadlessMode = false }: AppProps) {
   const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
   const [isLeadManagerOpen, setIsLeadManagerOpen] = useState(false);
   const [isVisualBuilderOpen, setIsVisualBuilderOpen] = useState(false);
-  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(getInitialAdminStatus);
   const [, setStoreRevision] = useState(0);
 
-  // Layout stability & hydration sync
+  // Guaranteed-to-load effect block: Enforces body content visibility, locks DOM stability, and prevents flash/disappearance
+  const [, setIsGuaranteedLoaded] = useState(false);
   useEffect(() => {
+    setIsGuaranteedLoaded(true);
     if (typeof document !== 'undefined') {
       document.body.classList.add('online-mmj-spa-mounted');
+      document.body.classList.add('online-mmj-spa-active');
+      document.body.classList.remove('online-mmj-loading');
+
+      const rootEl = document.getElementById('online-mmj-card-root') || document.getElementById('root');
+      if (rootEl) {
+        rootEl.style.minHeight = '100vh';
+        rootEl.style.display = 'flex';
+        rootEl.style.flexDirection = 'column';
+        rootEl.style.opacity = '1';
+        rootEl.style.visibility = 'visible';
+      }
     }
   }, []);
 
@@ -714,6 +745,37 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             />
           );
         })()}
+
+        {/* Guaranteed Fallback: Guarantees the body content is always rendered if route type is unrecognized */}
+        {!['home', 'city', 'state', 'service', 'condition', 'blog', 'article', 'book', 'contact', 'sitemap', 'custom-page'].includes(currentRoute.type) && (
+          <>
+            <HeroSection 
+              onOpenApply={handleOpenApply} 
+              onNavigateBook={handleNavigateBook}
+              onOpenAdminSettings={() => setIsLeadManagerOpen(true)}
+            />
+            <TrustStatsBar />
+            <HowItWorksSection onOpenApply={() => handleOpenApply()} />
+            <StateDirectorySection 
+              onOpenApply={(stateId) => handleOpenApply(stateId)}
+              onNavigateState={handleNavigateState}
+            />
+            <BenefitsComparisonSection onOpenApply={() => handleOpenApply()} />
+            <ServicesSection 
+              onOpenApply={handleOpenApply} 
+              onNavigateService={handleNavigateService}
+            />
+            <LocalCitiesDirectorySection
+              onNavigateCity={handleNavigateCity}
+              onOpenApply={handleOpenApply}
+            />
+            <QualifyingConditionsSection 
+              onOpenApply={() => handleOpenApply()} 
+              onNavigateCondition={handleNavigateCondition}
+            />
+            <FAQSection onOpenApply={() => handleOpenApply()} />
+          </>
+        )}
       </main>
 
       {/* High-Authority Healthcare Footer */}
@@ -785,6 +847,11 @@ export default function App({ isHeadlessMode = false }: AppProps) {
             <span>{isVisualBuilderOpen ? 'Close Editor' : '✏️ Visual Theme Builder'}</span>
           </button>
         </div>
+      )}
+
+      {/* Canonical SEO Diagnostic Tab / Section: ONLY rendered when isAdminUser state is true (Internal / Backend Only) */}
+      {isAdminUser && (
+        <CanonicalSEODiagnosticTab currentRoute={currentRoute} />
       )}
 
       {/* Live Sync Notification Toast from WordPress Page Builder Saves */}
